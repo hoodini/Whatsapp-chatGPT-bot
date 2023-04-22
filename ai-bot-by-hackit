@@ -1,0 +1,52 @@
+import openai
+from flask import Flask, request
+from twilio.twiml.messaging_response import MessagingResponse
+
+# Flask app configuration
+app = Flask(__name__)
+
+# Set your OpenAI API key
+openai.api_key = "your-openai-apikey"
+
+def get_chatgpt_response(prompt):
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "user", "content": prompt}
+            ]
+        )
+    print(response)
+    return response.choices[0].message['content']
+
+def generate_dalle_image(prompt):
+    response = openai.Image.create(
+        prompt=prompt,
+        n=2,
+        size="1024x1024",
+    )
+    return response['data'][0]['url']
+
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    # Get the incoming message
+    incoming_msg = request.values.get("Body", "").lower()
+
+    # Get ChatGPT response
+    chatgpt_response = get_chatgpt_response(incoming_msg)
+
+    # Check if the user wants to create AI art using DALL-E
+    resp = MessagingResponse()
+    if "create ai art" in incoming_msg:
+        # Generate DALL-E image based on ChatGPT response
+        image_url = generate_dalle_image(chatgpt_response)
+
+        # Add the image and text response to the message
+        resp.message(chatgpt_response).media(image_url)
+    else:
+        # Add only the text response to the message
+        resp.message(chatgpt_response)
+
+    return str(resp)
+
+if __name__ == "__main__":
+    app.run(debug=True)
